@@ -1,12 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:guardme_app/presentation/providers/auth_provider.dart';
-import 'package:guardme_app/presentation/providers/emotion_provider.dart';
-import 'package:image_picker/image_picker.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -14,16 +10,6 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
-
-    ref.listen<EmotionState>(emotionProvider, (_, state) {
-      if (!state.isLoading && state.isDistressed != null) {
-        _showEmotionResult(context, ref, state.isDistressed!);
-      } else if (!state.isLoading && state.error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(state.error!)),
-        );
-      }
-    });
 
     return Scaffold(
       backgroundColor: const Color(0xFFEBEBEB),
@@ -272,7 +258,7 @@ class HomePage extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              _buildEmotionCheckButton(context, ref),
+              _buildGuardIntelligenceButton(context),
             ],
           ),
         ),
@@ -280,14 +266,11 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmotionCheckButton(BuildContext context, WidgetRef ref) {
-    final emotionState = ref.watch(emotionProvider);
+  Widget _buildGuardIntelligenceButton(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: emotionState.isLoading
-            ? null
-            : () => _takeSelfieAndAnalyze(ref),
+        onTap: () => context.go('/guard-intelligence'),
         borderRadius: BorderRadius.circular(24),
         child: Ink(
           decoration: BoxDecoration(
@@ -298,26 +281,14 @@ class HomePage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
             child: Row(
               children: [
-                if (emotionState.isLoading)
-                  const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
-                    ),
-                  )
-                else
-                  const Icon(
-                    Icons.add_a_photo_outlined,
-                    size: 28,
-                    color: Colors.white,
-                  ),
+                const Icon(
+                  Icons.shield_rounded,
+                  size: 28,
+                  color: Colors.white,
+                ),
                 const SizedBox(width: 16),
                 Text(
-                  emotionState.isLoading
-                      ? 'ANALYZING...'
-                      : 'EMOTION CHECK',
+                  'GUARD INTELLIGENCE',
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -335,84 +306,6 @@ class HomePage extends ConsumerWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Future<void> _takeSelfieAndAnalyze(WidgetRef ref) async {
-    final picker = ImagePicker();
-    final xFile = await picker.pickImage(source: ImageSource.camera);
-    if (xFile == null) return;
-
-    final file = File(xFile.path);
-    ref.read(emotionProvider.notifier).analyzeImage(file);
-  }
-
-  void _showEmotionResult(BuildContext context, WidgetRef ref, bool isDistressed) {
-    final emotionState = ref.read(emotionProvider);
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        contentPadding: const EdgeInsets.symmetric(vertical: 32, horizontal: 32),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isDistressed ? Icons.warning_rounded : Icons.sentiment_satisfied_rounded,
-              size: 64,
-              color: isDistressed ? Colors.red : Colors.green,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              isDistressed ? 'YES' : 'NO',
-              style: GoogleFonts.poppins(
-                fontSize: 40,
-                fontWeight: FontWeight.w800,
-                color: isDistressed ? Colors.red : Colors.green,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isDistressed
-                  ? 'Signs of distress detected'
-                  : 'No signs of distress',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.black54,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            if (isDistressed && emotionState.calledContactName != null) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.phone_forwarded_rounded, color: Colors.red, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Calling ${emotionState.calledContactName}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              ref.read(emotionProvider.notifier).reset();
-            },
-            child: const Text('Done'),
-          ),
-        ],
       ),
     );
   }

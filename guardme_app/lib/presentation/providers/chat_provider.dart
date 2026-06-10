@@ -6,13 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:guardme_app/core/constants.dart';
 import 'package:guardme_app/domain/entities/chat_message.dart';
-import 'package:guardme_app/presentation/providers/contact_provider.dart';
+import 'package:guardme_app/presentation/providers/tool_service.dart';
 import 'package:openai_dart/openai_dart.dart' as openai;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class ChatState {
   final List<ChatMessage> messages;
@@ -59,7 +58,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   final AudioRecorder _recorder = AudioRecorder();
   Timer? _recordingTimer;
   String? _currentRecordingPath;
-  bool _distressCallInitiated = false;
+  final List<openai.ChatMessage> _pendingToolMessages = [];
 
   // Temporary store for audio base64 data (not persisted — too large for SP)
   final Map<String, String> _pendingAudioData = {};
@@ -71,19 +70,25 @@ Your job is to help the user stay safe, analyze their surroundings from photos, 
 
 You can hear voice messages directly AND see images directly.
 
-DISTRESS DETECTION RULES — FOLLOW THESE EXACTLY:
-1. When you hear voice messages, analyze the tone, pitch, crying, screaming, panic, and ANY emotional distress. If the user is crying, screaming, asking for help, or sounds panicked, you MUST append [DISTRESS:true].
-2. When you see images, analyze the person's facial expression for ANY signs of distress, fear, anxiety, discomfort, sadness, tension, or being scared. Look for furrowed brows, tight lips, wide eyes, tense jaw, forced smiles, or uneasy expressions. If ANY of these are present, you MUST append [DISTRESS:true].
-3. When reading text, if the user mentions being scared, in danger, hurt, or asks for help, you MUST append [DISTRESS:true].
-4. Do NOT hesitate. If there is ANY indication of distress in text, voice, or image, append [DISTRESS:true].
+You have access to tools that you can use to help the user:
+
+1. call_emergency_contact — Call an emergency contact immediately. Use this when the user is in distress, danger, scared, hurt, or asks for emergency help. Specify contact_name to call a specific person.
+2. get_current_location — Get the user's current GPS location coordinates. Use this to help with navigation, share location in emergencies, or provide location-aware assistance.
+3. list_emergency_contacts — List all the user's saved emergency contacts with names and phone numbers.
+4. send_emergency_alert — Send an emergency alert with current location to all emergency contacts.
+
+CRITICAL DISTRESS DETECTION:
+- When you hear voice messages, analyze tone, pitch, crying, screaming, panic, and ANY emotional distress.
+- When you see images, analyze facial expressions for ANY signs of distress, fear, anxiety, discomfort, sadness, tension, worry, or being scared.
+- When reading text, if the user mentions being scared, in danger, hurt, or asks for help.
+- If ANY distress is detected, use the call_emergency_contact tool immediately.
+- Do NOT hesitate. If there is ANY indication of distress, call an emergency contact.
 
 Behavior:
 - Be concise, supportive, and protective.
 - If the user sends a photo, describe anything relevant to their safety.
-- At the very end of your response, on its own line, append exactly this tag if you detected ANY distress:
-[DISTRESS:true]
-
-If no distress was detected, do NOT include the tag.
+- When you use a tool, briefly explain what you are doing.
+- If a tool fails, let the user know and suggest alternatives.
 ''';
 
   ChatNotifier(this._ref) : super(const ChatState()) {
@@ -124,6 +129,7 @@ If no distress was detected, do NOT include the tag.
   void clearChat() {
     state = state.copyWith(messages: []);
     _pendingAudioData.clear();
+    _pendingToolMessages.clear();
     _saveHistory();
   }
 
@@ -267,11 +273,17 @@ If no distress was detected, do NOT include the tag.
     );
     await _saveHistory();
     if (triggerResponse) {
+      _pendingToolMessages.clear();
       await _streamResponse(updatedMessages);
     }
   }
 
-  Future<void> _streamResponse(List<ChatMessage> allMessages) async {
+  Future<void> _streamResponse(List<ChatMessage> allMessages, {int toolDepth = 0}) async {
+    if (toolDepth > 5) {
+      state = state.copyWith(error: 'Maximum tool call depth reached');
+      return;
+    }
+
     try {
       final apiKey = AppConstants.opencodeGoApiKey;
       final baseUrl = AppConstants.openaiBaseUrl;
@@ -287,50 +299,17 @@ If no distress was detected, do NOT include the tag.
         ),
       );
 
+      // Build API messages: system prompt + displayed messages (filter out tool status) + pending tool round messages
       final apiMessages = <openai.ChatMessage>[
         const openai.SystemMessage(content: _systemPrompt),
         ...allMessages
+            .where((m) => !m.isToolStatus)
+            .toList()
             .sublist(
               allMessages.length > 20 ? allMessages.length - 20 : 0,
             )
-            .map((m) {
-          if (m.role == 'user') {
-            final parts = <openai.ContentPart>[];
-
-            // Add text if present
-            if (m.text != null && m.text!.isNotEmpty) {
-              parts.add(openai.ContentPart.text(m.text!));
-            }
-
-            // Add image if present
-            if (m.imagePath != null) {
-              final imgBytes = File(m.imagePath!).readAsBytesSync();
-              parts.add(openai.ContentPart.imageBase64(
-                data: base64Encode(imgBytes),
-                mediaType: 'image/jpeg',
-                detail: openai.ImageDetail.high,
-              ));
-            }
-
-            // Add audio directly if pending
-            if (m.audioPath != null && _pendingAudioData.containsKey(m.id)) {
-              parts.add(openai.ContentPart.inputAudio(
-                data: _pendingAudioData.remove(m.id)!,
-                format: openai.AudioFormat.wav,
-              ));
-            }
-
-            if (parts.length == 1 && parts.first is openai.TextContentPart) {
-              return openai.UserMessage(
-                content: openai.UserMessageContent.text(m.text ?? ''),
-              );
-            }
-            return openai.UserMessage(
-              content: openai.UserMessageContent.parts(parts),
-            );
-          }
-          return openai.AssistantMessage(content: m.text);
-        }),
+            .map(_toApiMessage),
+        ..._pendingToolMessages,
       ];
 
       final aiMessageId = _generateId();
@@ -348,13 +327,15 @@ If no distress was detected, do NOT include the tag.
         model: 'mimo-v2.5',
         maxTokens: 100000,
         messages: apiMessages,
+        tools: ToolService.toolDefinitions,
       );
 
-      _distressCallInitiated = false;
       final stream = client.chat.completions.createStream(request);
+      final allEvents = <openai.ChatStreamEvent>[];
       final buffer = StringBuffer();
 
       await for (final event in stream) {
+        allEvents.add(event);
         final delta = event.textDelta;
         if (delta != null) {
           buffer.write(delta);
@@ -368,30 +349,63 @@ If no distress was detected, do NOT include the tag.
             return m;
           }).toList();
           state = state.copyWith(messages: updatedList);
-
-          // Check for distress tag as soon as it appears in the stream
-          if (!_distressCallInitiated &&
-              buffer.toString().toLowerCase().contains('[distress:true]')) {
-            _distressCallInitiated = true;
-            state = state.copyWith(isDistressed: true);
-            _callEmergencyContact();
-          }
         }
+      }
+
+      // Check for tool calls by building accumulator from all events
+      final acc = openai.ChatStreamAccumulator();
+      for (final event in allEvents) {
+        acc.add(event);
+      }
+
+      if (acc.hasToolCalls) {
+        client.close();
+
+        // Remove the loading assistant message
+        _removeLoadingMessage();
+
+        // Echo assistant's tool calls into pending messages
+        _pendingToolMessages.add(
+          openai.AssistantMessage(content: null, toolCalls: acc.toolCalls),
+        );
+
+        // Execute each tool
+        final toolService = _ref.read(toolServiceProvider);
+        for (final tc in acc.toolCalls) {
+          _addToolStatusMessage(tc.function.name, 'running', tc);
+
+          final result = await toolService.executeTool(tc);
+
+          final success = result['success'] == true ||
+              (result['error'] == null &&
+                  result.containsKey('latitude'));
+          _updateToolStatus(
+            tc.function.name,
+            success ? 'completed' : 'failed',
+            result,
+          );
+
+          _pendingToolMessages.add(
+            openai.ToolMessage(
+              toolCallId: tc.id,
+              content: jsonEncode(result),
+            ),
+          );
+        }
+
+        // Recurse to get the model's text response after tool execution
+        await _streamResponse(allMessages, toolDepth: toolDepth + 1);
+        return;
       }
 
       client.close();
 
+      // No tool calls — handle the text response
       final fullResponse = buffer.toString();
-      final distressDetected = fullResponse.toLowerCase().contains('[distress:true]');
-      final cleanResponse = fullResponse.replaceAllMapped(
-        RegExp(r'\[DISTRESS:\s*TRUE\]', caseSensitive: false),
-        (_) => '',
-      ).trim();
-
       final finalList = state.messages.map((m) {
         if (m.id == aiMessageId) {
           return m.copyWith(
-            text: cleanResponse.isEmpty ? '(No response)' : cleanResponse,
+            text: fullResponse.isEmpty ? '(No response)' : fullResponse,
             isLoading: false,
           );
         }
@@ -400,16 +414,6 @@ If no distress was detected, do NOT include the tag.
 
       state = state.copyWith(messages: finalList, isLoading: false);
       await _saveHistory();
-
-      if (distressDetected && !_distressCallInitiated) {
-        _distressCallInitiated = true;
-        state = state.copyWith(isDistressed: true);
-        await _callEmergencyContact();
-        state = state.copyWith(isDistressed: false);
-      }
-      if (_distressCallInitiated) {
-        state = state.copyWith(isDistressed: false);
-      }
     } on openai.ApiException catch (e) {
       _removeLoadingMessage();
       state = state.copyWith(
@@ -426,41 +430,84 @@ If no distress was detected, do NOT include the tag.
     }
   }
 
+  openai.ChatMessage _toApiMessage(ChatMessage m) {
+    if (m.role == 'user') {
+      final parts = <openai.ContentPart>[];
+      if (m.text != null && m.text!.isNotEmpty) {
+        parts.add(openai.ContentPart.text(m.text!));
+      }
+      if (m.imagePath != null) {
+        final imgBytes = File(m.imagePath!).readAsBytesSync();
+        parts.add(openai.ContentPart.imageBase64(
+          data: base64Encode(imgBytes),
+          mediaType: 'image/jpeg',
+          detail: openai.ImageDetail.high,
+        ));
+      }
+      if (m.audioPath != null && _pendingAudioData.containsKey(m.id)) {
+        parts.add(openai.ContentPart.inputAudio(
+          data: _pendingAudioData.remove(m.id)!,
+          format: openai.AudioFormat.wav,
+        ));
+      }
+      if (parts.length == 1 && parts.first is openai.TextContentPart) {
+        return openai.UserMessage(
+          content: openai.UserMessageContent.text(m.text ?? ''),
+        );
+      }
+      return openai.UserMessage(
+        content: openai.UserMessageContent.parts(parts),
+      );
+    }
+    return openai.AssistantMessage(content: m.text);
+  }
+
+  void _addToolStatusMessage(String toolName, String status, openai.ToolCall tc) {
+    final statusMsg = ChatMessage(
+      id: _generateId(),
+      role: 'assistant',
+      toolName: toolName,
+      toolStatus: status,
+      timestamp: DateTime.now(),
+    );
+    state = state.copyWith(messages: [...state.messages, statusMsg]);
+  }
+
+  void _updateToolStatus(String toolName, String status, Map<String, dynamic> result) {
+    final updatedList = state.messages.map((m) {
+      if (m.isToolStatus && m.toolName == toolName && m.toolStatus == 'running') {
+        return m.copyWith(
+          toolStatus: status,
+          toolResult: status == 'completed'
+              ? _describeToolResult(toolName, result)
+              : 'Failed: ${result['error'] ?? 'Unknown error'}',
+        );
+      }
+      return m;
+    }).toList();
+    state = state.copyWith(messages: updatedList);
+  }
+
+  String _describeToolResult(String toolName, Map<String, dynamic> result) {
+    switch (toolName) {
+      case 'call_emergency_contact':
+        return 'Called ${result['contactName'] ?? 'emergency contact'}';
+      case 'get_current_location':
+        return 'Location: ${result['latitude']?.toStringAsFixed(4)}, ${result['longitude']?.toStringAsFixed(4)}';
+      case 'list_emergency_contacts':
+        final contacts = result['contacts'] as List?;
+        if (contacts == null || contacts.isEmpty) return 'No contacts found';
+        return '${contacts.length} contact(s) found';
+      case 'send_emergency_alert':
+        return result['success'] == true ? 'Alert sent' : 'Failed to send alert';
+      default:
+        return 'Completed';
+    }
+  }
+
   void _removeLoadingMessage() {
     final filtered = state.messages.where((m) => !m.isLoading).toList();
     state = state.copyWith(messages: filtered);
-  }
-
-  Future<void> _callEmergencyContact() async {
-    try {
-      final contactState = _ref.read(contactProvider);
-      var contacts = contactState.contacts;
-
-      if (contacts.isEmpty) {
-        await _ref.read(contactProvider.notifier).loadContacts();
-        contacts = _ref.read(contactProvider).contacts;
-      }
-
-      if (contacts.isEmpty) {
-        state = state.copyWith(
-          error: 'Distress detected but no emergency contacts available!',
-        );
-        return;
-      }
-
-      final contact = contacts.first;
-      state = state.copyWith(calledContactName: contact.name);
-      final uri = Uri(scheme: 'tel', path: contact.phone);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        state = state.copyWith(
-          error: 'Cannot initiate call to ${contact.name}',
-        );
-      }
-    } catch (e) {
-      debugPrint('[Chat] Error calling emergency: $e');
-    }
   }
 
   @override

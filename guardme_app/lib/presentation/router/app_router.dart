@@ -10,7 +10,7 @@ import 'package:guardme_app/presentation/pages/contact_list_page.dart';
 import 'package:guardme_app/presentation/pages/notification_page.dart';
 import 'package:guardme_app/presentation/pages/trip_details_page.dart';
 import 'package:guardme_app/presentation/pages/profile_page.dart';
-import 'package:guardme_app/presentation/pages/settings_page.dart';
+import 'package:guardme_app/presentation/pages/guard_intelligence_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
@@ -70,8 +70,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProfilePage(),
       ),
       GoRoute(
-        path: '/settings',
-        builder: (context, state) => const SettingsPage(),
+        path: '/guard-intelligence',
+        builder: (context, state) => const GuardIntelligencePage(),
       ),
     ],
   );

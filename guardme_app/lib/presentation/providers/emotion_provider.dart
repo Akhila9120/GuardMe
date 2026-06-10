@@ -4,10 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:guardme_app/core/constants.dart';
-import 'package:guardme_app/presentation/providers/contact_provider.dart';
-import 'package:anthropic_sdk_dart/anthropic_sdk_dart.dart';
-import 'package:logging/logging.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:guardme_app/presentation/providers/tool_service.dart';
+import 'package:openai_dart/openai_dart.dart';
 
 class EmotionState {
   final bool isLoading;
@@ -46,18 +44,6 @@ class EmotionNotifier extends StateNotifier<EmotionState> {
     debugPrint('[Emotion] Starting analyzeImage...');
     state = state.copyWith(isLoading: true, error: null, isDistressed: null, calledContactName: null);
 
-    final loggingSubscription = Logger.root.onRecord.listen((record) {
-      debugPrint(
-        '[AnthropicSDK] ${record.level.name}: ${record.message}',
-      );
-      if (record.error != null) {
-        debugPrint('[AnthropicSDK] ERROR: ${record.error}');
-      }
-      if (record.stackTrace != null) {
-        debugPrint('[AnthropicSDK] STACK: ${record.stackTrace}');
-      }
-    });
-
     try {
       debugPrint('[Emotion] Reading image file: ${imageFile.path}');
       final bytes = await imageFile.readAsBytes();
@@ -66,10 +52,10 @@ class EmotionNotifier extends StateNotifier<EmotionState> {
       debugPrint('[Emotion] Base64 length: ${base64Image.length} chars');
 
       final apiKey = AppConstants.opencodeGoApiKey;
-      final baseUrl = AppConstants.anthropicBaseUrl;
+      final baseUrl = AppConstants.openaiBaseUrl;
       debugPrint('[Emotion] API Key length: ${apiKey.length}');
       debugPrint('[Emotion] Base URL: $baseUrl');
-      debugPrint('[Emotion] Expected endpoint: $baseUrl/v1/messages');
+      debugPrint('[Emotion] Expected endpoint: $baseUrl/chat/completions');
 
       if (apiKey.isEmpty) {
         debugPrint('[Emotion] ERROR: API key is empty!');
@@ -80,66 +66,51 @@ class EmotionNotifier extends StateNotifier<EmotionState> {
         return;
       }
 
-      debugPrint('[Emotion] Creating AnthropicClient with logLevel=ALL...');
-      final client = AnthropicClient(
-        config: AnthropicConfig(
+      debugPrint('[Emotion] Creating OpenAIClient...');
+      final client = OpenAIClient(
+        config: OpenAIConfig(
           authProvider: ApiKeyProvider(apiKey),
           baseUrl: baseUrl,
-          logLevel: Level.ALL,
         ),
       );
       debugPrint('[Emotion] Client created successfully');
 
-      final request = MessageCreateRequest(
-          model: 'qwen3.7-plus',
+      final request = ChatCompletionCreateRequest(
+          model: 'mimo-v2.5',
           maxTokens: 30000,
-          thinking: const ThinkingDisabled(),
         messages: [
-          InputMessage.userBlocks([
-            InputContentBlock.text(
-              "Analyze this person's facial expression for ANY signs of distress, fear, anxiety, discomfort, sadness, tension, worry, or being scared. Be highly sensitive — even subtle signs like furrowed brows, tight lips, wide eyes, tense jaw, forced smile, or any uneasy expression should count. If there is ANY doubt or even a slight indication of fear or distress, flag it as true. Only return false if the person is clearly calm, relaxed, and genuinely happy.\n\n"
-              "You MUST respond with EXACTLY this JSON format, using these exact field names:\n"
-              '{"distressed": true, "confidence": 0.95}\n\n'
-              'The "distressed" field must be a boolean (true or false). The "confidence" field must be a number between 0 and 1.\n'
-              "Do NOT use any other field names. Do NOT add any other fields. Do NOT wrap in markdown code blocks. Return ONLY the JSON object.",
-            ),
-            InputContentBlock.image(
-              ImageSource.base64(
-                data: base64Image,
-                mediaType: ImageMediaType.jpeg,
-              ),
+          ChatMessage.user([
+            ContentPart.text("Analyze this person's facial expression for ANY signs of distress, fear, anxiety, discomfort, sadness, tension, worry, or being scared. Be highly sensitive — even subtle signs like furrowed brows, tight lips, wide eyes, tense jaw, forced smile, or any uneasy expression should count. If there is ANY doubt or even a slight indication of fear or distress, flag it as true. Only return false if the person is clearly calm, relaxed, and genuinely happy.\n\n"
+                "You MUST respond with EXACTLY this JSON format, using these exact field names:\n"
+                '{"distressed": true, "confidence": 0.95}\n\n'
+                'The "distressed" field must be a boolean (true or false). The "confidence" field must be a number between 0 and 1.\n'
+                "Do NOT use any other field names. Do NOT add any other fields. Do NOT wrap in markdown code blocks. Return ONLY the JSON object."),
+            ContentPart.imageBase64(
+              data: base64Image,
+              mediaType: 'image/jpeg',
+              detail: ImageDetail.high,
             ),
           ]),
         ],
-        outputConfig: const OutputConfig(
-          format: JsonOutputFormat(
-            schema: {
-              'type': 'object',
-              'properties': {
-                'distressed': {'type': 'boolean'},
-                'confidence': {'type': 'number'},
-              },
-              'required': ['distressed', 'confidence'],
-            },
-          ),
-        ),
       );
       debugPrint('[Emotion] Request built: model=${request.model}, maxTokens=${request.maxTokens}');
 
       debugPrint('[Emotion] Sending API request...');
-      final response = await client.messages.create(request);
+      final response = await client.chat.completions.create(request);
       debugPrint('[Emotion] Response received!');
-      debugPrint('[Emotion] Response ID: ${response.id}');
       debugPrint('[Emotion] Response model: ${response.model}');
-      debugPrint('[Emotion] Response stopReason: ${response.stopReason}');
-      debugPrint('[Emotion] Response usage: input=${response.usage.inputTokens}, output=${response.usage.outputTokens}');
+
+      final tokens = response.usage;
+      if (tokens != null) {
+        debugPrint('[Emotion] Response usage: input=${tokens.promptTokens}, output=${tokens.completionTokens}');
+      }
 
       final text = response.text;
       debugPrint('[Emotion] Response text: $text');
 
-      if (text.isNotEmpty) {
+      if (text != null && text.isNotEmpty) {
         debugPrint('[Emotion] Parsing JSON...');
-        
+
         String jsonText = text.trim();
         final codeBlockRegex = RegExp(r'```(?:json)?\s*(\{.*?\})\s*```', dotAll: true);
         final match = codeBlockRegex.firstMatch(jsonText);
@@ -154,20 +125,20 @@ class EmotionNotifier extends StateNotifier<EmotionState> {
             debugPrint('[Emotion] Extracted JSON from text');
           }
         }
-        
+
         debugPrint('[Emotion] JSON to parse: $jsonText');
         final json = jsonDecode(jsonText) as Map<String, dynamic>;
         debugPrint('[Emotion] Parsed JSON: $json');
-        
-        final distressed = (json['distressed'] as bool?) ?? 
-                          (json['distress_detected'] as bool?) ??
-                          (json['is_showing_distress'] as bool?) ??
-                          (json['is_distressed'] as bool?) ??
-                          (json['shows_distress_or_fear'] as bool?) ??
-                          (json['shows_distress'] as bool?) ??
-                          (json['distress'] as bool?) ??
-                          (json['fear'] as bool?) ??
-                          false;
+
+        final distressed = (json['distressed'] as bool?) ??
+            (json['distress_detected'] as bool?) ??
+            (json['is_showing_distress'] as bool?) ??
+            (json['is_distressed'] as bool?) ??
+            (json['shows_distress_or_fear'] as bool?) ??
+            (json['shows_distress'] as bool?) ??
+            (json['distress'] as bool?) ??
+            (json['fear'] as bool?) ??
+            false;
         final confidence = json['confidence'] ?? json['confidence_score'];
         debugPrint('[Emotion] distressed=$distressed, confidence=$confidence');
         state = state.copyWith(
@@ -191,16 +162,16 @@ class EmotionNotifier extends StateNotifier<EmotionState> {
       debugPrint('[Emotion] Client closed. Done.');
     } on ApiException catch (e) {
       debugPrint('[Emotion] ApiException: status=${e.statusCode}, message=${e.message}');
-      debugPrint('[Emotion] ApiException details: ${e.details}');
+      debugPrint('[Emotion] ApiException details: ${e.body}');
       state = state.copyWith(
         isLoading: false,
         error: 'API Error ${e.statusCode}: ${e.message}',
       );
-    } on AnthropicException catch (e) {
-      debugPrint('[Emotion] AnthropicException: ${e.toString()}');
+    } on OpenAIException catch (e) {
+      debugPrint('[Emotion] OpenAIException: ${e.toString()}');
       state = state.copyWith(
         isLoading: false,
-        error: 'Anthropic SDK Error: ${e.toString()}',
+        error: 'OpenAI SDK Error: ${e.toString()}',
       );
     } catch (e, stackTrace) {
       debugPrint('[Emotion] UNEXPECTED ERROR: ${e.toString()}');
@@ -209,49 +180,31 @@ class EmotionNotifier extends StateNotifier<EmotionState> {
         isLoading: false,
         error: 'Unexpected error: ${e.toString()}',
       );
-    } finally {
-      await loggingSubscription.cancel();
     }
   }
 
   Future<void> _callEmergencyContact() async {
     try {
-      debugPrint('[Emotion] Fetching emergency contacts...');
-      final contactState = _ref.read(contactProvider);
-      var contacts = contactState.contacts;
-
-      if (contacts.isEmpty) {
-        debugPrint('[Emotion] No contacts cached, loading from server...');
-        await _ref.read(contactProvider.notifier).loadContacts();
-        contacts = _ref.read(contactProvider).contacts;
-      }
-
-      if (contacts.isEmpty) {
-        debugPrint('[Emotion] ERROR: No emergency contacts found!');
+      debugPrint('[Emotion] Using ToolService to call emergency contact...');
+      final toolService = _ref.read(toolServiceProvider);
+      final result = await toolService.emergencyCall();
+      final success = result['success'] == true;
+      debugPrint('[Emotion] ToolService result: success=$success, data=$result');
+      if (success) {
         state = state.copyWith(
-          error: 'Distress detected but no emergency contacts available to call!',
+          calledContactName: result['contactName'] as String?,
         );
-        return;
-      }
-
-      final contact = contacts.first;
-      debugPrint('[Emotion] Calling contact: ${contact.name} (${contact.phone})');
-      state = state.copyWith(calledContactName: contact.name);
-
-      final uri = Uri(scheme: 'tel', path: contact.phone);
-      if (await canLaunchUrl(uri)) {
-        debugPrint('[Emotion] Launching phone dialer: $uri');
-        await launchUrl(uri);
-        debugPrint('[Emotion] Phone dialer launched successfully');
       } else {
-        debugPrint('[Emotion] ERROR: Cannot launch phone dialer for $uri');
         state = state.copyWith(
-          error: 'Cannot initiate call to ${contact.name}. Phone dialer not available.',
+          error: result['error'] as String? ?? 'Failed to call emergency contact',
         );
       }
     } catch (e, stackTrace) {
       debugPrint('[Emotion] ERROR calling emergency contact: $e');
       debugPrint('[Emotion] STACK TRACE:\n$stackTrace');
+      state = state.copyWith(
+        error: 'Error calling emergency contact: $e',
+      );
     }
   }
 

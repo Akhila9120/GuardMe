@@ -32,7 +32,7 @@ class AppConstants {
       dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
   static String get alanVoiceKey => dotenv.env['ALAN_VOICE_KEY'] ?? '';
   static String get opencodeGoApiKey => dotenv.env['OPENCODE_GO_API_KEY'] ?? '';
-  static String get anthropicBaseUrl =>
-      dotenv.env['ANTHROPIC_BASE_URL'] ?? 'https://opencode.ai/zen/go';
+  static String get openaiBaseUrl =>
+      dotenv.env['OPENAI_BASE_URL'] ?? 'https://opencode.ai/zen/go/v1';
   static const Duration tokenRefreshThreshold = Duration(minutes: 5);
 }

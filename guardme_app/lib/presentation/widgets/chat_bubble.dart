@@ -13,6 +13,8 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.isToolStatus) return _ToolStatusBubble(message: message);
+
     final isUser = message.role == 'user';
     final bubbleColor =
         isUser ? const Color(0xFF6750A4) : Colors.white;
@@ -433,5 +435,110 @@ class _AudioBubbleState extends State<_AudioBubble> {
     final minutes = totalSeconds ~/ 60;
     final seconds = totalSeconds % 60;
     return '${minutes}m${seconds}s';
+  }
+}
+
+class _ToolStatusBubble extends StatelessWidget {
+  final ChatMessage message;
+
+  const _ToolStatusBubble({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          const SizedBox(width: 40),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _statusIcon,
+                const SizedBox(width: 6),
+                Text(
+                  _label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color get _backgroundColor {
+    switch (message.toolStatus) {
+      case 'completed':
+        return const Color(0xFFE8F5E9);
+      case 'failed':
+        return const Color(0xFFFFEBEE);
+      default:
+        return const Color(0xFFE3F2FD);
+    }
+  }
+
+  Widget get _statusIcon {
+    switch (message.toolStatus) {
+      case 'completed':
+        return const Icon(Icons.check_circle, size: 14, color: Color(0xFF2E7D32));
+      case 'failed':
+        return const Icon(Icons.error, size: 14, color: Color(0xFFC62828));
+      default:
+        return SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1565C0)),
+          ),
+        );
+    }
+  }
+
+  String get _label {
+    final name = message.toolName ?? 'tool';
+    switch (name) {
+      case 'call_emergency_contact':
+        return message.toolStatus == 'completed'
+            ? (message.toolResult ?? '✅ Contact called')
+            : message.toolStatus == 'failed'
+            ? (message.toolResult ?? '❌ Call failed')
+            : '📞 Calling emergency contact...';
+      case 'get_current_location':
+        return message.toolStatus == 'completed'
+            ? (message.toolResult ?? '📍 Location obtained')
+            : message.toolStatus == 'failed'
+            ? (message.toolResult ?? '❌ Location failed')
+            : '📍 Getting your location...';
+      case 'list_emergency_contacts':
+        return message.toolStatus == 'completed'
+            ? (message.toolResult ?? '📋 Contacts loaded')
+            : message.toolStatus == 'failed'
+            ? (message.toolResult ?? '❌ Failed to load contacts')
+            : '📋 Fetching contacts...';
+      case 'send_emergency_alert':
+        return message.toolStatus == 'completed'
+            ? (message.toolResult ?? '🚨 Alert sent')
+            : message.toolStatus == 'failed'
+            ? (message.toolResult ?? '❌ Alert failed')
+            : '🚨 Sending emergency alert...';
+      default:
+        return message.toolStatus == 'completed'
+            ? '✅ $name completed'
+            : message.toolStatus == 'failed'
+            ? '❌ $name failed'
+            : '⏳ Running $name...';
+    }
   }
 }
