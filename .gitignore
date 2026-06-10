@@ -1,0 +1,21 @@
+# Environment files (contains secrets — use .env.example as template)
+.env
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+backend/target/
+*.jar
+
+# Flutter
+guardme_app/build/
+guardme_app/.dart_tool/
+guardme_app/.packages
+guardme_app/.pub/

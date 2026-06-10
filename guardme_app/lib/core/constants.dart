@@ -1,16 +1,11 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class AppConstants {
   static const String appName = 'GuardMe';
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8080',
-  );
-  static const String googleMapsApiKey = String.fromEnvironment(
-    'GOOGLE_MAPS_API_KEY',
-    defaultValue: '',
-  );
-  static const String alanVoiceKey = String.fromEnvironment(
-    'ALAN_VOICE_KEY',
-    defaultValue: '',
-  );
+  static String get baseUrl =>
+      dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
+  static String get googleMapsApiKey =>
+      dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+  static String get alanVoiceKey => dotenv.env['ALAN_VOICE_KEY'] ?? '';
   static const Duration tokenRefreshThreshold = Duration(minutes: 5);
 }
