@@ -29,7 +29,7 @@ class HomePage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.person_outline_rounded, size: 28, color: Colors.black87),
-            onPressed: () => context.go('/profile'),
+            onPressed: () => context.push('/home/profile'),
           ),
           const SizedBox(width: 8),
         ],
@@ -111,7 +111,7 @@ class HomePage extends ConsumerWidget {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  context.go('/notifications');
+                  context.push('/home/notifications');
                 },
               ),
               ListTile(
@@ -155,7 +155,7 @@ class HomePage extends ConsumerWidget {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  context.go('/settings');
+                  context.push('/settings');
                 },
               ),
               const Spacer(),
@@ -235,25 +235,25 @@ class HomePage extends ConsumerWidget {
                     context,
                     icon: Icons.directions_car_outlined,
                     label: 'Start Trip',
-                    onTap: () => context.go('/map'),
+                    onTap: () => context.push('/home/map'),
                   ),
                   _buildMenuButton(
                     context,
                     icon: Icons.assignment_ind_outlined,
                     label: 'Contacts',
-                    onTap: () => context.go('/contacts'),
+                    onTap: () => context.push('/home/contacts'),
                   ),
                   _buildMenuButton(
                     context,
                     icon: Icons.chat_bubble_outline_rounded,
                     label: 'Notification',
-                    onTap: () => context.go('/notifications'),
+                    onTap: () => context.push('/home/notifications'),
                   ),
                   _buildMenuButton(
                     context,
                     icon: Icons.map_outlined,
                     label: 'My Trips',
-                    onTap: () => context.go('/trips'),
+                    onTap: () => context.push('/home/trips'),
                   ),
                 ],
               ),
@@ -270,7 +270,7 @@ class HomePage extends ConsumerWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => context.go('/guard-intelligence'),
+        onTap: () => context.push('/home/guard-intelligence'),
         borderRadius: BorderRadius.circular(24),
         child: Ink(
           decoration: BoxDecoration(

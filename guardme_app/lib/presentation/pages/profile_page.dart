@@ -22,7 +22,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.canPop() ? context.pop() : context.go('/home'),
+          onPressed: () => context.pop(),
         ),
         title: Text(
           'Profile',

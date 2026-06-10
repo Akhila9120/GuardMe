@@ -11,6 +11,7 @@ import 'package:guardme_app/presentation/pages/notification_page.dart';
 import 'package:guardme_app/presentation/pages/trip_details_page.dart';
 import 'package:guardme_app/presentation/pages/profile_page.dart';
 import 'package:guardme_app/presentation/pages/guard_intelligence_page.dart';
+import 'package:guardme_app/presentation/pages/settings_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
@@ -19,15 +20,16 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authState = ref.read(authProvider);
       final isAuthenticated = authState.status == AuthStatus.authenticated;
-      final isAuthRoute = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/signup' ||
-          state.matchedLocation == '/splash' ||
-          state.matchedLocation == '/settings';
+      final path = state.matchedLocation;
+      final isAuthRoute = path == '/login' ||
+          path == '/signup' ||
+          path == '/splash' ||
+          path == '/settings';
 
       if (!isAuthenticated && !isAuthRoute) {
         return '/login';
       }
-      if (isAuthenticated && isAuthRoute && state.matchedLocation != '/settings') {
+      if (isAuthenticated && isAuthRoute && path != '/settings') {
         return '/home';
       }
       return null;
@@ -46,32 +48,38 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SignupPage(),
       ),
       GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsPage(),
+      ),
+      GoRoute(
         path: '/home',
         builder: (context, state) => const HomePage(),
-      ),
-      GoRoute(
-        path: '/map',
-        builder: (context, state) => const MapPage(),
-      ),
-      GoRoute(
-        path: '/contacts',
-        builder: (context, state) => const ContactListPage(),
-      ),
-      GoRoute(
-        path: '/notifications',
-        builder: (context, state) => const NotificationPage(),
-      ),
-      GoRoute(
-        path: '/trips',
-        builder: (context, state) => const TripDetailsPage(),
-      ),
-      GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfilePage(),
-      ),
-      GoRoute(
-        path: '/guard-intelligence',
-        builder: (context, state) => const GuardIntelligencePage(),
+        routes: [
+          GoRoute(
+            path: 'guard-intelligence',
+            builder: (context, state) => const GuardIntelligencePage(),
+          ),
+          GoRoute(
+            path: 'map',
+            builder: (context, state) => const MapPage(),
+          ),
+          GoRoute(
+            path: 'contacts',
+            builder: (context, state) => const ContactListPage(),
+          ),
+          GoRoute(
+            path: 'notifications',
+            builder: (context, state) => const NotificationPage(),
+          ),
+          GoRoute(
+            path: 'trips',
+            builder: (context, state) => const TripDetailsPage(),
+          ),
+          GoRoute(
+            path: 'profile',
+            builder: (context, state) => const ProfilePage(),
+          ),
+        ],
       ),
     ],
   );

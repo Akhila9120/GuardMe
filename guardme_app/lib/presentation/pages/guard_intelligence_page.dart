@@ -144,7 +144,7 @@ class _GuardIntelligencePageState
       scrolledUnderElevation: 1,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_rounded, color: Colors.black87),
-        onPressed: () => context.go('/home'),
+          onPressed: () => context.pop(),
       ),
       title: Row(
         children: [
