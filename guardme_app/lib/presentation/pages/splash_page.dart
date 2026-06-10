@@ -20,6 +20,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
 
   Future<void> _checkAuth() async {
     await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
     ref.read(authProvider.notifier).checkSession();
   }
 
@@ -28,9 +29,10 @@ class _SplashPageState extends ConsumerState<SplashPage> {
     final authState = ref.watch(authProvider);
 
     ref.listen<AuthState>(authProvider, (previous, next) {
+      if (!mounted) return;
       if (next.status == AuthStatus.authenticated) {
         context.go('/home');
-      } else if (next.status == AuthStatus.unauthenticated) {
+      } else if (next.status == AuthStatus.unauthenticated && previous?.status == AuthStatus.loading) {
         context.go('/login');
       }
     });
