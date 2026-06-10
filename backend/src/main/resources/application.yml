@@ -1,0 +1,54 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/guardme?useUnicode=true&characterEncoding=utf8&useSSL=false&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      poolName: Hikari
+      auto-commit: false
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/master.xml
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      adjust-dates-to-context-time-zone: false
+
+hazelcast:
+  network:
+    join:
+      multicast:
+        enabled: false
+    tcp-ip:
+      enabled: false
+
+jhipster:
+  security:
+    authentication:
+      jwt:
+        base64-secret: ${JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET:}
+        token-validity-seconds: 86400
+        token-validity-seconds-for-remember-me: 2592000
+
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  from-number: ${TWILIO_FROM_NUMBER:}
+
+logging:
+  level:
+    ROOT: INFO
+    com.guardme: DEBUG

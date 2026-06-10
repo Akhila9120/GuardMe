@@ -1,0 +1,61 @@
+services:
+  mysql:
+    image: mysql:8.2.0
+    container_name: guardme-mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: guardme
+    command: mysqld --lower_case_table_names=1 --skip-ssl --character_set_server=utf8mb4 --explicit_defaults_for_timestamp
+    healthcheck:
+      test: ["CMD", "mysql", "-e", "SHOW DATABASES;"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    restart: unless-stopped
+    networks:
+      - guardme-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: guardme-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: "prod,api-docs,docker"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/guardme?useUnicode=true&characterEncoding=utf8&useSSL=false&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_USERNAME: "root"
+      SPRING_DATASOURCE_PASSWORD: ""
+      SPRING_LIQUIBASE_URL: "jdbc:mysql://mysql:3306/guardme?useUnicode=true&characterEncoding=utf8&useSSL=false&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true"
+      SPRING_LIQUIBASE_USERNAME: "root"
+      SPRING_LIQUIBASE_PASSWORD: ""
+      JHIPSTER_SECURITY_AUTHENTICATION_JWT_BASE64_SECRET: "${JWT_SECRET:-MTE5ZjZlZDI0ODVjYmQ3ODE3NDIwN2ZkYTZhNmU1ZGVlYjY3NDk4NTM1ZWM0ZmY2NWUxZDgwYmQyZmRjYTlkMDFiODhmM2RlMGQ1MTI2YTA4OTM3Zjc1NTA1NmFhOWFjMTU5MDhmMzQ1MGY4NjJkZDRmYzc4MjNkZGZkY2UzYzc=}"
+      JHIPSTER_CORS_ALLOWED_ORIGINS: "*"
+      JHIPSTER_CORS_ALLOWED_ORIGIN_PATTERNS: "https://*.githubpreview.dev,http://10.0.2.2.*"
+      MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/management/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - guardme-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  guardme-network:
+    driver: bridge

@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="1" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="jhi_authority"/></not>
+        </preConditions>
+        <createTable tableName="jhi_authority">
+            <column name="name" type="VARCHAR(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="jhi_user"/></not>
+        </preConditions>
+        <createTable tableName="jhi_user">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="login" type="VARCHAR(50)">
+                <constraints unique="true" nullable="false"/>
+            </column>
+            <column name="password_hash" type="VARCHAR(60)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="first_name" type="VARCHAR(50)"/>
+            <column name="last_name" type="VARCHAR(50)"/>
+            <column name="email" type="VARCHAR(254)"/>
+            <column name="activated" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="lang_key" type="VARCHAR(10)" defaultValue="en"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="3" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="jhi_user_authority"/></not>
+        </preConditions>
+        <createTable tableName="jhi_user_authority">
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="authority_name" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addPrimaryKey tableName="jhi_user_authority" columnNames="user_id, authority_name"/>
+        <addForeignKeyConstraint baseTableName="jhi_user_authority" baseColumnNames="user_id"
+                                 constraintName="fk_user_id" referencedTableName="jhi_user"
+                                 referencedColumnNames="id"/>
+        <addForeignKeyConstraint baseTableName="jhi_user_authority" baseColumnNames="authority_name"
+                                 constraintName="fk_authority_name" referencedTableName="jhi_authority"
+                                 referencedColumnNames="name"/>
+    </changeSet>
+
+    <changeSet id="4" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="app_user"/></not>
+        </preConditions>
+        <createTable tableName="app_user">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="phone" type="VARCHAR(20)"/>
+            <column name="address" type="TEXT"/>
+            <column name="emergency_contact" type="VARCHAR(20)"/>
+            <column name="user_id" type="BIGINT"/>
+            <column name="created_at" type="TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="app_user" baseColumnNames="user_id"
+                                 constraintName="fk_app_user_user_id" referencedTableName="jhi_user"
+                                 referencedColumnNames="id"/>
+        <addUniqueConstraint tableName="app_user" columnNames="user_id"/>
+    </changeSet>
+
+    <changeSet id="5" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="profile"/></not>
+        </preConditions>
+        <createTable tableName="profile">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="bio" type="TEXT"/>
+            <column name="avatar" type="VARCHAR(255)"/>
+            <column name="date_of_birth" type="DATE"/>
+            <column name="gender" type="VARCHAR(20)"/>
+            <column name="app_user_id" type="BIGINT"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="profile" baseColumnNames="app_user_id"
+                                 constraintName="fk_profile_app_user_id" referencedTableName="app_user"
+                                 referencedColumnNames="id"/>
+        <addUniqueConstraint tableName="profile" columnNames="app_user_id"/>
+    </changeSet>
+
+    <changeSet id="6" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="trips"/></not>
+        </preConditions>
+        <createTable tableName="trips">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="start_time" type="TIMESTAMP"/>
+            <column name="end_time" type="TIMESTAMP"/>
+            <column name="start_latitude" type="DOUBLE"/>
+            <column name="start_longitude" type="DOUBLE"/>
+            <column name="end_latitude" type="DOUBLE"/>
+            <column name="end_longitude" type="DOUBLE"/>
+            <column name="status" type="VARCHAR(20)"/>
+            <column name="app_user_id" type="BIGINT"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="trips" baseColumnNames="app_user_id"
+                                 constraintName="fk_trips_app_user_id" referencedTableName="app_user"
+                                 referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="7" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="contacts"/></not>
+        </preConditions>
+        <createTable tableName="contacts">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="phone" type="VARCHAR(20)"/>
+            <column name="email" type="VARCHAR(254)"/>
+            <column name="relationship" type="VARCHAR(50)"/>
+            <column name="app_user_id" type="BIGINT"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="contacts" baseColumnNames="app_user_id"
+                                 constraintName="fk_contacts_app_user_id" referencedTableName="app_user"
+                                 referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="8" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="emergency_alerts"/></not>
+        </preConditions>
+        <createTable tableName="emergency_alerts">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="alert_time" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="message" type="TEXT"/>
+            <column name="status" type="VARCHAR(20)"/>
+            <column name="latitude" type="DOUBLE"/>
+            <column name="longitude" type="DOUBLE"/>
+            <column name="app_user_id" type="BIGINT"/>
+            <column name="trip_id" type="BIGINT"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="emergency_alerts" baseColumnNames="app_user_id"
+                                 constraintName="fk_alert_app_user_id" referencedTableName="app_user"
+                                 referencedColumnNames="id"/>
+        <addForeignKeyConstraint baseTableName="emergency_alerts" baseColumnNames="trip_id"
+                                 constraintName="fk_alert_trip_id" referencedTableName="trips"
+                                 referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="9" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="voice_data"/></not>
+        </preConditions>
+        <createTable tableName="voice_data">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="file_path" type="VARCHAR(255)"/>
+            <column name="duration" type="INT"/>
+            <column name="recorded_at" type="TIMESTAMP"/>
+            <column name="trip_id" type="BIGINT"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="voice_data" baseColumnNames="trip_id"
+                                 constraintName="fk_voice_trip_id" referencedTableName="trips"
+                                 referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="10" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="gov_authorities"/></not>
+        </preConditions>
+        <createTable tableName="gov_authorities">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="department" type="VARCHAR(100)"/>
+            <column name="phone" type="VARCHAR(20)"/>
+            <column name="email" type="VARCHAR(254)"/>
+            <column name="jurisdiction" type="VARCHAR(100)"/>
+            <column name="region" type="VARCHAR(100)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="11" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM jhi_authority</sqlCheck>
+        </preConditions>
+        <insert tableName="jhi_authority">
+            <column name="name" value="ROLE_USER"/>
+        </insert>
+        <insert tableName="jhi_authority">
+            <column name="name" value="ROLE_ADMIN"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>
