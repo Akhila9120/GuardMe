@@ -79,10 +79,13 @@ The `.env` file lives at **`guardme_app/.env`**. Flutter reads it at runtime.
 | Platform | Value | Notes |
 |----------|-------|-------|
 | Android Emulator | `http://10.0.2.2:8080` | 10.0.2.2 reaches host machine |
-| Android Device (USB) | `http://<your-ip>:8080` | Use your LAN IP |
+| Android Device (USB/Wi-Fi) | `http://<your-ip>:8080` | See [Find your IP](#6-same-network--finding-your-ip) |
+| iOS Device (physical) | `http://<your-ip>:8080` | Same network required; use LAN IP |
 | iOS Simulator | `http://localhost:8080` | Simulator shares host network |
 | Linux Desktop | `http://localhost:8080` | Runs natively on host |
 | Chrome Web | `http://localhost:8080` | Runs in browser |
+
+> **Tip:** You can also set the backend URL at runtime from the app's **Settings** screen — no need to edit `.env` files every time.
 
 ### 4. Start backend (Docker)
 
@@ -91,17 +94,48 @@ From the **project root** (`guardmev2/`):
 docker compose up -d
 ```
 
-This starts:
-- **MySQL 8.2** on port `3306` (internally, no external access needed)
-- **Backend API** on port `8080`
+What this does:
+- `docker compose up` — Creates and starts MySQL + Backend containers
+- `-d` — Runs in detached mode (background), so you can keep using the terminal
 
-Check it's healthy:
+This starts:
+- **MySQL 8.2** — port `3306` (exposed to host for debugging; only needed inside Docker network)
+- **Backend API** — port `8080`
+
+First startup takes ~2-3 minutes (Docker builds the backend + Liquibase runs migrations).
+
+#### View logs
+
+```bash
+docker compose logs -f          # tail all services
+docker compose logs -f backend  # backend only
+docker compose logs -f mysql    # database only
+```
+
+Press `Ctrl+C` to exit log view (containers keep running).
+
+#### Check health
+
 ```bash
 curl http://localhost:8080/management/health
 # → {"status": "UP"}
 ```
 
-First startup takes ~2-3 minutes (Docker builds the backend + Liquibase runs migrations).
+If the response is `{"status": "UP"}`, the backend is ready.
+
+#### Restart after code changes
+
+```bash
+docker compose build --no-cache backend   # rebuild the image
+docker compose up -d                      # recreate containers
+```
+
+Or as a single command:
+```bash
+docker compose up -d --build
+```
+
+---
 
 ### 5. Run Flutter app
 
@@ -117,12 +151,114 @@ Select your device when prompted:
 - Linux desktop (if on Linux)
 - Connected Android device
 
-### 6. Stop everything
+To run on a **specific device** without the prompt:
+```bash
+flutter devices                        # list available devices
+flutter run -d <device-id>             # e.g. flutter run -d chrome
+```
+
+#### How to use the app
+
+The app has the following screens:
+
+| Route | Screen | What it does |
+|-------|--------|--------------|
+| `/splash` | Splash | Auto-check auth, redirects to `/login` or `/home` |
+| `/signup` | Sign Up | Create a new account (name, email, password) |
+| `/login` | Login | Sign in with existing credentials |
+| `/home` | Dashboard | Main hub with quick-access tiles (SOS, Map, Trips, Contacts, Notifications) |
+| `/map` | Live Map | Real-time location tracking with Google Maps |
+| `/contacts` | Emergency Contacts | Add/edit trusted contacts who get alerts |
+| `/notifications` | Notifications | View alert history and trip notifications |
+| `/trips` | Trip Details | Active trip tracking with shareable links |
+| `/profile` | Profile | View/edit user profile and guardian settings |
+| `/settings` | Settings | **Configure backend server URL** (see below) |
+
+**Settings screen** — If your device can't reach the backend, go to `/settings`:
+1. Toggle **"Use default address"** OFF
+2. Enter your machine's IP address (see step 6 below)
+3. Tap **"Test Connection"** to verify
+4. Tap **"Save Settings"** and **restart the app**
+
+---
+
+### 6. Same network & finding your IP
+
+**The Flutter app and the Docker backend MUST be on the same network** to communicate. Use your machine's LAN IP (not `localhost` or `127.0.0.1`) when running on a physical phone or a different device.
+
+#### Find your IP on Linux
 
 ```bash
+ip addr show | grep 'inet ' | grep -v 127.0.0.1
+# or
+hostname -I
+```
+
+Example output: `192.168.1.100` — use this as the backend IP.
+
+#### Find your IP on Windows
+
+**Option 1 — Run the included script (easiest):**
+
+Double-click `find_ip.bat` from the project folder. It prints only your IPv4 addresses.
+
+**Option 2 — PowerShell:**
+
+```powershell
+ipconfig
+```
+
+Look for the **IPv4 Address** under your active network adapter (Wi-Fi or Ethernet).
+
+Example output: `192.168.1.105` — use this as the backend IP.
+
+#### Find your IP on macOS
+
+```bash
+ipconfig getifaddr en0   # Wi-Fi
+ipconfig getifaddr en1   # Ethernet
+```
+
+#### Set it in the Flutter app
+
+Once you have your IP:
+1. Open the app → go to **Settings** (`/settings`)
+2. Toggle **"Use default address"** OFF
+3. Enter your IP (e.g., `192.168.1.100`) and port (`8080`)
+4. Tap **"Test Connection"** — should show a green success
+5. Tap **"Save Settings"** and **restart the app**
+
+Alternatively, set it in the `.env` file (`guardme_app/.env`):
+```env
+API_BASE_URL=http://192.168.1.100:8080
+```
+
+Then restart the app.
+
+---
+
+### 7. Stop everything
+
+```bash
+# Stop containers (keeps data volumes):
 docker compose down
-# Add -v to also delete the database:
+
+# Stop containers AND delete the database volume:
 docker compose down -v
+```
+
+| Command | Stops containers | Removes containers | Deletes DB data | Deletes images |
+|---------|:---:|:---:|:---:|:---:|
+| `docker compose stop` | Yes | No | No | No |
+| `docker compose down` | Yes | Yes | No | No |
+| `docker compose down -v` | Yes | Yes | Yes | No |
+| `docker compose down --rmi all` | Yes | Yes | No | Yes |
+
+Use `docker compose down` for normal shutdown. Use `-v` only if you want a **clean slate** (all data wiped).
+
+To see what's running:
+```bash
+docker compose ps
 ```
 
 ---
@@ -224,9 +360,15 @@ target_compile_options(${TARGET} PRIVATE -Wno-deprecated-literal-operator)
 ### Flutter can't connect to backend
 
 1. Check backend is running: `curl http://localhost:8080/management/health`
-2. Check `API_BASE_URL` in `guardme_app/.env` matches your platform
-3. Android emulator: use `10.0.2.2` (not `localhost`)
-4. Physical Android device: use your computer's LAN IP
+2. **Are both devices on the same network?** Phone and computer must be on the same Wi-Fi. Mobile data won't work.
+3. Check `API_BASE_URL` in `guardme_app/.env` matches your platform
+4. Android emulator: use `10.0.2.2` (not `localhost`)
+5. Physical Android/iOS device: use your computer's **LAN IP** (see [Find your IP](#6-same-network--finding-your-ip) above)
+6. Use the in-app **Settings** screen (`/settings`) to test and configure the backend URL without editing files
+7. Firewall may block port 8080. On Linux, allow it:
+   ```bash
+   sudo ufw allow 8080/tcp
+   ```
 
 ### Port already in use
 
