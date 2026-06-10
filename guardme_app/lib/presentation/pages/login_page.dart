@@ -57,6 +57,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.canPop() ? context.pop() : context.go('/splash'),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Center(

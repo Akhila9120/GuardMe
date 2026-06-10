@@ -21,7 +21,18 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   Future<void> _checkAuth() async {
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
-    ref.read(authProvider.notifier).checkSession();
+    
+    // Add timeout to prevent hanging if backend is unreachable
+    try {
+      await ref.read(authProvider.notifier).checkSession().timeout(
+        const Duration(seconds: 5),
+      );
+    } catch (e) {
+      // If timeout or error, force unauthenticated state
+      if (mounted) {
+        ref.read(authProvider.notifier).logout();
+      }
+    }
   }
 
   @override
@@ -38,44 +49,56 @@ class _SplashPageState extends ConsumerState<SplashPage> {
     });
 
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(
-                Icons.shield,
-                size: 60,
-                color: Colors.white,
-              ),
+      body: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Icon(
+                    Icons.shield,
+                    size: 60,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'GuardMe',
+                  style: GoogleFonts.poppins(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your safety companion',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 48),
+                const CircularProgressIndicator(),
+              ],
             ),
-            const SizedBox(height: 24),
-            Text(
-              'GuardMe',
-              style: GoogleFonts.poppins(
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).primaryColor,
-              ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 16,
+            right: 16,
+            child: IconButton(
+              icon: const Icon(Icons.settings_outlined, size: 28),
+              onPressed: () => context.push('/settings'),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Your safety companion',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 48),
-            const CircularProgressIndicator(),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

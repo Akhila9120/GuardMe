@@ -10,6 +10,7 @@ import 'package:guardme_app/presentation/pages/contact_list_page.dart';
 import 'package:guardme_app/presentation/pages/notification_page.dart';
 import 'package:guardme_app/presentation/pages/trip_details_page.dart';
 import 'package:guardme_app/presentation/pages/profile_page.dart';
+import 'package:guardme_app/presentation/pages/settings_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
@@ -20,12 +21,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthenticated = authState.status == AuthStatus.authenticated;
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/signup' ||
-          state.matchedLocation == '/splash';
+          state.matchedLocation == '/splash' ||
+          state.matchedLocation == '/settings';
 
       if (!isAuthenticated && !isAuthRoute) {
         return '/login';
       }
-      if (isAuthenticated && isAuthRoute) {
+      if (isAuthenticated && isAuthRoute && state.matchedLocation != '/settings') {
         return '/home';
       }
       return null;
@@ -66,6 +68,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfilePage(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsPage(),
       ),
     ],
   );

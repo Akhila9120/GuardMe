@@ -9,15 +9,18 @@ final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
 });
 
 final dioClientProvider = Provider<Dio>((ref) {
+  final storage = ref.read(secureStorageProvider);
+  final baseUrl = AppConstants.baseUrl;
+
   final dio = Dio(BaseOptions(
-    baseUrl: AppConstants.baseUrl,
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 30),
+    baseUrl: baseUrl,
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
     headers: {'Content-Type': 'application/json'},
   ));
 
-  dio.interceptors.add(AuthInterceptor(ref));
-  dio.interceptors.add(ErrorInterceptor(ref));
+  dio.interceptors.add(AuthInterceptor(storage));
+  dio.interceptors.add(ErrorInterceptor(storage, baseUrl));
 
   if (kDebugMode) {
     dio.interceptors.add(LogInterceptor(
@@ -30,9 +33,9 @@ final dioClientProvider = Provider<Dio>((ref) {
 });
 
 class AuthInterceptor extends Interceptor {
-  final Ref _ref;
+  final FlutterSecureStorage _storage;
 
-  AuthInterceptor(this._ref);
+  AuthInterceptor(this._storage);
 
   @override
   void onRequest(
@@ -41,8 +44,7 @@ class AuthInterceptor extends Interceptor {
   ) async {
     if (!options.path.contains('/authenticate') &&
         !options.path.contains('/register')) {
-      final storage = _ref.read(secureStorageProvider);
-      final token = await storage.read(key: 'jwt_token');
+      final token = await _storage.read(key: 'jwt_token');
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
       }
@@ -52,21 +54,21 @@ class AuthInterceptor extends Interceptor {
 }
 
 class ErrorInterceptor extends Interceptor {
-  final Ref _ref;
+  final FlutterSecureStorage _storage;
+  final String _baseUrl;
 
-  ErrorInterceptor(this._ref);
+  ErrorInterceptor(this._storage, this._baseUrl);
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
-      final storage = _ref.read(secureStorageProvider);
-      final refreshToken = await storage.read(key: 'refresh_token');
+      final refreshToken = await _storage.read(key: 'refresh_token');
       if (refreshToken != null) {
         try {
           final dio = Dio(BaseOptions(
-            baseUrl: AppConstants.baseUrl,
-            connectTimeout: const Duration(seconds: 30),
-            receiveTimeout: const Duration(seconds: 30),
+            baseUrl: _baseUrl,
+            connectTimeout: const Duration(seconds: 10),
+            receiveTimeout: const Duration(seconds: 10),
           ));
           final response = await dio.post(
             '/api/refresh-token',
@@ -74,14 +76,14 @@ class ErrorInterceptor extends Interceptor {
           );
           if (response.statusCode == 200) {
             final newToken = response.data['id_token'] as String;
-            await storage.write(key: 'jwt_token', value: newToken);
+            await _storage.write(key: 'jwt_token', value: newToken);
             err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
             final retryResponse = await dio.fetch(err.requestOptions);
             handler.resolve(retryResponse);
             return;
           }
         } catch (_) {
-          await storage.deleteAll();
+          await _storage.deleteAll();
         }
       }
     }
