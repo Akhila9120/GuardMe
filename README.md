@@ -94,6 +94,13 @@ From the **project root** (`guardmev2/`):
 docker compose up -d
 ```
 
+Or use the included scripts:
+
+| OS | Script |
+|----|--------|
+| Windows | Double-click `start_backend.bat` |
+| Linux/macOS | `./start_backend.sh` |
+
 What this does:
 - `docker compose up` — Creates and starts MySQL + Backend containers
 - `-d` — Runs in detached mode (background), so you can keep using the terminal
@@ -246,6 +253,13 @@ docker compose down
 # Stop containers AND delete the database volume:
 docker compose down -v
 ```
+
+Or use the included scripts:
+
+| OS | Script |
+|----|--------|
+| Windows | Double-click `stop_backend.bat` |
+| Linux/macOS | `./stop_backend.sh` |
 
 | Command | Stops containers | Removes containers | Deletes DB data | Deletes images |
 |---------|:---:|:---:|:---:|:---:|
