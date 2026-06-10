@@ -312,17 +312,6 @@ Behavior:
         ..._pendingToolMessages,
       ];
 
-      final aiMessageId = _generateId();
-      final initialAiMessage = ChatMessage(
-        id: aiMessageId,
-        role: 'assistant',
-        text: '',
-        timestamp: DateTime.now(),
-        isLoading: true,
-      );
-
-      state = state.copyWith(messages: [...state.messages, initialAiMessage]);
-
       final request = openai.ChatCompletionCreateRequest(
         model: 'mimo-v2.5',
         maxTokens: 100000,
@@ -332,12 +321,27 @@ Behavior:
 
       final stream = client.chat.completions.createStream(request);
       final allEvents = <openai.ChatStreamEvent>[];
+      String? aiMessageId;
       final buffer = StringBuffer();
 
       await for (final event in stream) {
         allEvents.add(event);
         final delta = event.textDelta;
         if (delta != null) {
+          // Lazily create the assistant bubble on first text token
+          if (aiMessageId == null) {
+            aiMessageId = _generateId();
+            state = state.copyWith(messages: [
+              ...state.messages,
+              ChatMessage(
+                id: aiMessageId,
+                role: 'assistant',
+                text: '',
+                timestamp: DateTime.now(),
+                isLoading: true,
+              ),
+            ]);
+          }
           buffer.write(delta);
           final updatedList = state.messages.map((m) {
             if (m.id == aiMessageId) {
@@ -361,8 +365,7 @@ Behavior:
       if (acc.hasToolCalls) {
         client.close();
 
-        // Remove the loading assistant message
-        _removeLoadingMessage();
+        // No loading message to remove since we never created one for tool calls
 
         // Echo assistant's tool calls into pending messages
         _pendingToolMessages.add(
@@ -402,18 +405,21 @@ Behavior:
 
       // No tool calls — handle the text response
       final fullResponse = buffer.toString();
-      final finalList = state.messages.map((m) {
-        if (m.id == aiMessageId) {
-          return m.copyWith(
-            text: fullResponse.isEmpty ? '(No response)' : fullResponse,
-            isLoading: false,
-          );
-        }
-        return m;
-      }).toList();
-
-      state = state.copyWith(messages: finalList, isLoading: false);
-      await _saveHistory();
+      if (aiMessageId != null) {
+        final finalList = state.messages.map((m) {
+          if (m.id == aiMessageId) {
+            return m.copyWith(
+              text: fullResponse.isEmpty ? '(No response)' : fullResponse,
+              isLoading: false,
+            );
+          }
+          return m;
+        }).toList();
+        state = state.copyWith(messages: finalList, isLoading: false);
+        await _saveHistory();
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
     } on openai.ApiException catch (e) {
       _removeLoadingMessage();
       state = state.copyWith(

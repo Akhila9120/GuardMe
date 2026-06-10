@@ -170,14 +170,6 @@ class _GuardIntelligencePageState
                   color: Colors.black87,
                 ),
               ),
-              if (chatState.isLoading)
-                Text(
-                  'Thinking...',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    color: Colors.black54,
-                  ),
-                ),
             ],
           ),
         ],
