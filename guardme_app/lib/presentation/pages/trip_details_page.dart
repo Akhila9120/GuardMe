@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:guardme_app/presentation/providers/trip_provider.dart';
 
@@ -23,6 +24,10 @@ class _TripDetailsPageState extends ConsumerState<TripDetailsPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/home'),
+        ),
         title: Text(
           'Trip History',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),

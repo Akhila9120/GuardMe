@@ -12,12 +12,11 @@ import 'package:guardme_app/presentation/pages/trip_details_page.dart';
 import 'package:guardme_app/presentation/pages/profile_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
-
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: '/splash',
     debugLogDiagnostics: false,
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
       final isAuthenticated = authState.status == AuthStatus.authenticated;
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/signup' ||
@@ -70,4 +69,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+
+  ref.listen<AuthState>(authProvider, (_, next) {
+    router.refresh();
+  });
+
+  return router;
 });

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:guardme_app/presentation/providers/auth_provider.dart';
-import 'package:guardme_app/presentation/providers/trip_provider.dart';
 import 'package:guardme_app/utils/menu_tab.dart';
 
 class HomePage extends ConsumerWidget {
@@ -24,6 +23,10 @@ class HomePage extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () => context.go('/notifications'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => ref.read(authProvider.notifier).logout(),
           ),
         ],
       ),

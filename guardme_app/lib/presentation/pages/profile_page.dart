@@ -20,6 +20,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/home'),
+        ),
         title: Text(
           'Profile',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),

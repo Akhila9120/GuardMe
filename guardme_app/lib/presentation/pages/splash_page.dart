@@ -26,7 +26,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
+    ref.watch(authProvider);
 
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (!mounted) return;
