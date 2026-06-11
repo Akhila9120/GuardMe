@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerts — GuardMe Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul><li><strong>GuardMe Admin</strong></li></ul>
+      <ul>
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="alerts.html">Alerts</a></li>
+        <li><a href="trips.html">Trips</a></li>
+        <li><a href="#" onclick="logout()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <h1>Emergency Alerts</h1>
+    <div id="error" style="color: var(--pico-del-color); display: none;"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>User</th>
+          <th>Time</th>
+          <th>Message</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="alerts-tbody"></tbody>
+    </table>
+  </main>
+  <script src="js/api.js"></script>
+  <script>
+    requireAuth();
+    (async () => {
+      try {
+        const alerts = await apiFetch('/alerts');
+        const tbody = document.getElementById('alerts-tbody');
+        for (const a of alerts) {
+          const tr = document.createElement('tr');
+          const isResolved = a.status === 'RESOLVED';
+          tr.innerHTML = `
+            <td>${escapeHtml(a.id)}</td>
+            <td>${escapeHtml(a.appUser?.user?.login || a.appUser?.id || '—')}</td>
+            <td>${escapeHtml(a.alertTime)}</td>
+            <td>${escapeHtml(a.message)}</td>
+            <td>${isResolved ? '<span class="role-admin">RESOLVED</span>' : escapeHtml(a.status)}</td>
+            <td>${isResolved ? '—' : '<button class="outline" data-id="' + a.id + '">Resolve</button>'}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+        tbody.addEventListener('click', async (e) => {
+          if (e.target.tagName !== 'BUTTON') return;
+          const btn = e.target;
+          btn.disabled = true;
+          try {
+            await apiFetch('/alerts/' + btn.dataset.id + '/resolve', { method: 'PUT' });
+            const row = btn.closest('tr');
+            row.children[4].innerHTML = '<span class="role-admin">RESOLVED</span>';
+            row.children[5].textContent = '—';
+          } catch (x) {
+            document.getElementById('error').textContent = 'Failed to resolve alert: ' + x.message;
+            document.getElementById('error').style.display = 'block';
+          }
+        });
+      } catch (x) {
+        document.getElementById('error').textContent = 'Failed to load alerts: ' + x.message;
+        document.getElementById('error').style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>

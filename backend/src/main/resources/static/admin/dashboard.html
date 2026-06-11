@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — GuardMe Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul><li><strong>GuardMe Admin</strong></li></ul>
+      <ul>
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="alerts.html">Alerts</a></li>
+        <li><a href="trips.html">Trips</a></li>
+        <li><a href="#" onclick="logout()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <h1>Dashboard</h1>
+    <div class="grid" id="stats">
+      <article><h2 id="stat-users">—</h2><p>Total Users</p></article>
+      <article><h2 id="stat-trips">—</h2><p>Total Trips</p></article>
+      <article><h2 id="stat-alerts">—</h2><p>Total Alerts</p></article>
+      <article><h2 id="stat-activeTrips">—</h2><p>Active Trips</p></article>
+      <article><h2 id="stat-pendingAlerts">—</h2><p>Pending Alerts</p></article>
+    </div>
+  </main>
+  <script src="js/api.js"></script>
+  <script>
+    requireAuth();
+    (async () => {
+      const stats = await apiFetch('/stats');
+      for (const [key, val] of Object.entries(stats)) {
+        document.getElementById('stat-' + key).textContent = val;
+      }
+    })();
+  </script>
+</body>
+</html>

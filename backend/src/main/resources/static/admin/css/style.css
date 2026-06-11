@@ -1,0 +1,23 @@
+.role-admin {
+  background: var(--pico-primary);
+  color: var(--pico-primary-inverse);
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.status-emergency {
+  color: var(--pico-del-color);
+  font-weight: 700;
+}
+.status-active {
+  color: var(--pico-primary);
+  font-weight: 600;
+}
+#stats .grid article {
+  text-align: center;
+}
+#stats .grid h2 {
+  margin-bottom: 0;
+  font-size: 2.5rem;
+}

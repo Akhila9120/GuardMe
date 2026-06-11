@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Users — GuardMe Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul><li><strong>GuardMe Admin</strong></li></ul>
+      <ul>
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="alerts.html">Alerts</a></li>
+        <li><a href="trips.html">Trips</a></li>
+        <li><a href="#" onclick="logout()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <h1>Users</h1>
+    <div id="error" style="color: var(--pico-del-color); display: none;"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Login</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Roles</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="users-tbody"></tbody>
+    </table>
+  </main>
+  <script src="js/api.js"></script>
+  <script>
+    requireAuth();
+    (async () => {
+      try {
+        const users = await apiFetch('/users');
+        const tbody = document.getElementById('users-tbody');
+        for (const u of users) {
+          const tr = document.createElement('tr');
+          const isAdmin = (u.authorities || []).includes('ROLE_ADMIN');
+          tr.innerHTML = `
+            <td>${escapeHtml(u.id)}</td>
+            <td>${escapeHtml(u.login)}</td>
+            <td>${escapeHtml(u.firstName)} ${escapeHtml(u.lastName)}</td>
+            <td>${escapeHtml(u.email)}</td>
+            <td>${escapeHtml(u.phone)}</td>
+            <td>${isAdmin ? '<span class="role-admin">Admin</span>' : 'User'}</td>
+            <td><button class="outline" data-id="${u.id}" data-admin="${isAdmin}">${isAdmin ? 'Remove Admin' : 'Make Admin'}</button></td>
+          `;
+          tbody.appendChild(tr);
+        }
+        tbody.addEventListener('click', async (e) => {
+          if (e.target.tagName !== 'BUTTON') return;
+          const btn = e.target;
+          btn.disabled = true;
+          try {
+            const result = await apiFetch('/users/' + btn.dataset.id + '/role', { method: 'PUT' });
+            btn.dataset.admin = result.isAdmin;
+            btn.textContent = result.isAdmin ? 'Remove Admin' : 'Make Admin';
+            const roleCell = btn.closest('tr').children[5];
+            roleCell.innerHTML = result.isAdmin ? '<span class="role-admin">Admin</span>' : 'User';
+          } catch (x) {
+            document.getElementById('error').textContent = 'Failed to update role: ' + x.message;
+            document.getElementById('error').style.display = 'block';
+          }
+          btn.disabled = false;
+        });
+      } catch (x) {
+        document.getElementById('error').textContent = 'Failed to load users: ' + x.message;
+        document.getElementById('error').style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>

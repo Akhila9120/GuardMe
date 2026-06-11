@@ -82,6 +82,11 @@ public class EmergencyAlertService {
     }
 
     @Transactional(readOnly = true)
+    public List<EmergencyAlert> getAllAlerts() {
+        return emergencyAlertRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
     public List<EmergencyAlert> getAllByUser(Long appUserId) {
         return emergencyAlertRepository.findByAppUserId(appUserId);
     }

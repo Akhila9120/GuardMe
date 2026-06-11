@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login — GuardMe</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    body { display: flex; align-items: center; min-height: 100vh; }
+    article { max-width: 400px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <article>
+    <hgroup>
+      <h1>GuardMe Admin</h1>
+      <p>Sign in to manage the platform</p>
+    </hgroup>
+    <form id="loginForm">
+      <label>
+        Username or Email
+        <input type="text" name="username" autocomplete="username" required>
+      </label>
+      <label>
+        Password
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p id="error" style="color: var(--pico-del-color); display: none;"></p>
+      <button type="submit">Sign In</button>
+    </form>
+  </article>
+  <script src="js/api.js"></script>
+  <script>
+    if (getToken()) { window.location.href = 'dashboard.html'; }
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      const err = document.getElementById('error');
+      err.style.display = 'none';
+      try {
+        await login(e.target.username.value, e.target.password.value);
+        window.location.href = 'dashboard.html';
+      } catch (x) {
+        err.textContent = 'Invalid username or password';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

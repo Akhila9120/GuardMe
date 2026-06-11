@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trips — GuardMe Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul><li><strong>GuardMe Admin</strong></li></ul>
+      <ul>
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="alerts.html">Alerts</a></li>
+        <li><a href="trips.html">Trips</a></li>
+        <li><a href="#" onclick="logout()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <h1>Trips</h1>
+    <div id="error" style="color: var(--pico-del-color); display: none;"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>User</th>
+          <th>Start</th>
+          <th>End</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="trips-tbody"></tbody>
+    </table>
+  </main>
+  <script src="js/api.js"></script>
+  <script>
+    requireAuth();
+    (async () => {
+      try {
+        const trips = await apiFetch('/trips');
+        const tbody = document.getElementById('trips-tbody');
+        for (const t of trips) {
+          const tr = document.createElement('tr');
+          let statusClass = '';
+          if (t.status === 'EMERGENCY') statusClass = 'status-emergency';
+          else if (t.status === 'ACTIVE') statusClass = 'status-active';
+          tr.innerHTML = `
+            <td>${escapeHtml(t.id)}</td>
+            <td>${escapeHtml(t.appUser?.user?.login || t.appUser?.id || '—')}</td>
+            <td>${escapeHtml(t.startTime)}</td>
+            <td>${escapeHtml(t.endTime) || '—'}</td>
+            <td class="${statusClass}">${escapeHtml(t.status)}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      } catch (x) {
+        document.getElementById('error').textContent = 'Failed to load trips: ' + x.message;
+        document.getElementById('error').style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>
