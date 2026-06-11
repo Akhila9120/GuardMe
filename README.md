@@ -124,7 +124,7 @@ Press `Ctrl+C` to exit log view (containers keep running).
 #### Check health
 
 ```bash
-curl http://localhost:8080/management/health
+curl http://localhost:8080/actuator/health
 # → {"status": "UP"}
 ```
 
@@ -277,7 +277,78 @@ docker compose ps
 
 ---
 
-## Platform-Specific Notes
+### 8. Admin Panel (Web)
+
+The admin panel is a lightweight web interface served directly from the backend for managing users, alerts, and trips.
+
+#### Access
+
+Once the backend is running, open in any browser:
+
+```
+http://localhost:8080/admin/login.html
+```
+
+On a remote machine (same network), use your machine's LAN IP instead of `localhost`:
+```
+http://192.168.1.100:8080/admin/login.html
+```
+
+#### Pages
+
+| Page | URL | Description |
+|------|-----|-------------|
+| Login | `/admin/login.html` | Sign in with your GuardMe credentials |
+| Dashboard | `/admin/dashboard.html` | Stats overview: total users, trips, alerts, active trips, pending alerts |
+| Users | `/admin/users.html` | List all users with **Make Admin / Remove Admin** toggle |
+| Alerts | `/admin/alerts.html` | View and resolve emergency alerts |
+| Trips | `/admin/trips.html` | Monitor all trips with status highlighting |
+
+#### Making a user an admin
+
+1. Log in with an existing admin account (see [First admin setup](#first-admin-setup) below)
+2. Go to **Users** → click **Make Admin** on the desired user
+
+#### First admin setup
+
+No admin users are seeded automatically. To create the first admin:
+
+**Option A — From the app:**
+1. Register a new account through the Flutter app
+2. Grant admin via the database:
+   ```bash
+   docker exec -it guardme-mysql mysql -u root guardme
+   ```
+   ```sql
+   INSERT INTO jhi_user_authority (user_id, authority_name)
+   VALUES (<user-id>, 'ROLE_ADMIN');
+   ```
+   Find the user ID:
+   ```sql
+   SELECT id, login FROM jhi_user;
+   ```
+
+**Option B — Via API (recommended):**
+```bash
+# Register a user
+curl -X POST http://localhost:8080/api/register \
+  -H 'Content-Type: application/json' \
+  -d '{"login":"admin","password":"admin123","firstName":"Admin","lastName":"User","email":"admin@guardme.com"}'
+
+# Grant ROLE_ADMIN via SQL
+docker exec guardme-mysql mysql -u root -e "
+  INSERT IGNORE INTO guardme.jhi_user_authority (user_id, authority_name)
+  SELECT id, 'ROLE_ADMIN' FROM guardme.jhi_user WHERE login = 'admin';
+"
+```
+
+After that, log in at `/admin/login.html` with the credentials you registered.
+
+#### Tech note
+
+The admin panel is plain HTML/CSS/JS using [Pico CSS](https://picocss.com) (from CDN). It calls the backend's `/api/admin/*` endpoints and stores the JWT in `localStorage`. Static files are served from `backend/src/main/resources/static/admin/`. All endpoints require `ROLE_ADMIN` and are guarded by `@PreAuthorize("hasRole('ADMIN')")`.
+
+---
 
 ### Windows (Docker Desktop)
 
@@ -373,7 +444,7 @@ target_compile_options(${TARGET} PRIVATE -Wno-deprecated-literal-operator)
 
 ### Flutter can't connect to backend
 
-1. Check backend is running: `curl http://localhost:8080/management/health`
+1. Check backend is running: `curl http://localhost:8080/actuator/health`
 2. **Are both devices on the same network?** Phone and computer must be on the same Wi-Fi. Mobile data won't work.
 3. Check `API_BASE_URL` in `guardme_app/.env` matches your platform
 4. Android emulator: use `10.0.2.2` (not `localhost`)
