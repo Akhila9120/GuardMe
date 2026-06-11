@@ -130,6 +130,11 @@ curl http://localhost:8080/actuator/health
 
 If the response is `{"status": "UP"}`, the backend is ready.
 
+> **After pulling new code from git**, `docker compose up -d` alone is **not enough** — it reuses the old cached image. You must rebuild:
+> ```bash
+> docker compose up -d --build
+> ```
+
 #### Restart after code changes
 
 ```bash
