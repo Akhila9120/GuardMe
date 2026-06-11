@@ -452,6 +452,9 @@ class _ToolStatusBubble extends StatelessWidget {
         children: [
           const SizedBox(width: 40),
           Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.65,
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: _backgroundColor,
@@ -462,11 +465,13 @@ class _ToolStatusBubble extends StatelessWidget {
               children: [
                 _statusIcon,
                 const SizedBox(width: 6),
-                Text(
-                  _label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                Flexible(
+                  child: Text(
+                    _label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],

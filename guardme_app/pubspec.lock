@@ -1349,6 +1349,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.2"
+  twilio_voice_sms:
+    dependency: "direct main"
+    description:
+      name: twilio_voice_sms
+      sha256: "553196deb7cd2b7fcc6c5f35b934aa75a88588ffc26051d9854bd0ace9aec47e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.2"
   typed_data:
     dependency: transitive
     description:

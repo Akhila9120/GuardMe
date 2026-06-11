@@ -76,6 +76,7 @@ You have access to tools that you can use to help the user:
 2. get_current_location — Get the user's current GPS location coordinates. Use this to help with navigation, share location in emergencies, or provide location-aware assistance.
 3. list_emergency_contacts — List all the user's saved emergency contacts with names and phone numbers.
 4. send_emergency_alert — Send an emergency alert with current location to all emergency contacts.
+5. send_sms_message — Send an SMS text message to a specific emergency contact. Use this when the user wants to send a message to someone, check in, or notify them about something. Specify contact_name for a specific person and message for the content.
 
 CRITICAL DISTRESS DETECTION:
 - When you hear voice messages, analyze tone, pitch, crying, screaming, panic, and ANY emotional distress.
@@ -499,6 +500,10 @@ Behavior:
       case 'call_emergency_contact':
         return 'Called ${result['contactName'] ?? 'emergency contact'}';
       case 'get_current_location':
+        final address = result['address'] as String?;
+        if (address != null && address.isNotEmpty) {
+          return 'Location: $address (${result['latitude']?.toStringAsFixed(4)}, ${result['longitude']?.toStringAsFixed(4)})';
+        }
         return 'Location: ${result['latitude']?.toStringAsFixed(4)}, ${result['longitude']?.toStringAsFixed(4)}';
       case 'list_emergency_contacts':
         final contacts = result['contacts'] as List?;
@@ -506,6 +511,10 @@ Behavior:
         return '${contacts.length} contact(s) found';
       case 'send_emergency_alert':
         return result['success'] == true ? 'Alert sent' : 'Failed to send alert';
+      case 'send_sms_message':
+        return result['success'] == true
+            ? 'SMS sent to ${result['contactName'] ?? 'contact'}'
+            : 'Failed to send SMS';
       default:
         return 'Completed';
     }

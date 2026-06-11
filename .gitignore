@@ -1,5 +1,6 @@
 # Environment files (contains secrets — use .env.example as template)
 .env
+guardme_app/.env
 
 # IDE
 .idea/

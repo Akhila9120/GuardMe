@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:guardme_app/data/repositories/emergency_repository.dart';
 import 'package:guardme_app/domain/entities/contact.dart';
 import 'package:guardme_app/domain/entities/emergency_alert.dart';
 import 'package:guardme_app/presentation/providers/contact_provider.dart';
 import 'package:openai_dart/openai_dart.dart';
+import 'package:twilio_voice_sms/twilio_voice_sms.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 final toolServiceProvider = Provider<ToolService>((ref) {
@@ -35,7 +37,7 @@ class ToolService {
         Tool.function(
           name: 'get_current_location',
           description:
-              'Get the user\'s current GPS location coordinates including latitude, longitude, and address details. Use this to help with navigation, share location in emergencies, or provide location-aware assistance.',
+              'Get the user\'s current GPS location including latitude, longitude, place name, area, and full address. Use this to help with navigation, share your location in emergencies, or provide location-aware assistance.',
           parameters: {
             'type': 'object',
             'properties': {},
@@ -64,6 +66,26 @@ class ToolService {
             },
           },
         ),
+        Tool.function(
+          name: 'send_sms_message',
+          description:
+              'Send an SMS text message to one of the user\'s emergency contacts. Use this when the user wants to send a specific message to a specific person, or to check in with someone. Specify contact_name to send to a specific person.',
+          parameters: {
+            'type': 'object',
+            'properties': {
+              'contact_name': {
+                'type': 'string',
+                'description':
+                    'Optional specific contact name to send the SMS to. If not provided, sends to the first available emergency contact.',
+              },
+              'message': {
+                'type': 'string',
+                'description': 'The message content to send via SMS.',
+              },
+            },
+            'required': ['message'],
+          },
+        ),
       ];
 
   Future<Map<String, dynamic>> executeTool(ToolCall toolCall) async {
@@ -77,6 +99,12 @@ class ToolService {
         return _listContacts();
       case 'send_emergency_alert':
         return _sendEmergencyAlert(toolCall);
+      case 'send_sms_message':
+        final args = toolCall.function.argumentsMap;
+        return _sendSms(
+          contactName: args['contact_name'] as String?,
+          message: args['message'] as String? ?? '',
+        );
       default:
         return {'error': 'Unknown tool: ${toolCall.function.name}'};
     }
@@ -154,12 +182,49 @@ class ToolService {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      return {
+      final result = <String, dynamic>{
         'latitude': position.latitude,
         'longitude': position.longitude,
         'accuracy': position.accuracy,
         'altitude': position.altitude,
       };
+
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final p = placemarks.first;
+          final pName = p.name;
+          final pStreet = p.street;
+          final pSubLocality = p.subLocality;
+          final pLocality = p.locality;
+          final pAdminArea = p.administrativeArea;
+          final pCountry = p.country;
+          final nameParts = <String>[
+            if (pName != null && pName.isNotEmpty) pName,
+            if (pStreet != null && pStreet.isNotEmpty) pStreet,
+          ];
+          final areaParts = <String>[
+            if (pSubLocality != null && pSubLocality.isNotEmpty)
+              pSubLocality,
+            if (pLocality != null && pLocality.isNotEmpty) pLocality,
+            if (pAdminArea != null && pAdminArea.isNotEmpty) pAdminArea,
+            if (pCountry != null && pCountry.isNotEmpty) pCountry,
+          ];
+          final placeName = nameParts.isNotEmpty ? nameParts.join(', ') : null;
+          final area = areaParts.isNotEmpty ? areaParts.join(', ') : null;
+          result['place_name'] = placeName;
+          result['area'] = area;
+          result['address'] = [if (placeName != null) placeName, if (area != null) area]
+              .join(', ');
+        }
+      } catch (_) {
+        // Reverse geocoding failed — coordinates are still available
+      }
+
+      return result;
     } catch (e) {
       return {'error': 'Failed to get location: $e'};
     }
@@ -227,6 +292,60 @@ class ToolService {
       };
     } catch (e) {
       return {'success': false, 'error': 'Failed to send alert: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> _sendSms({
+    String? contactName,
+    required String message,
+  }) async {
+    try {
+      final contactState = _ref.read(contactProvider);
+      var contacts = contactState.contacts;
+
+      if (contacts.isEmpty) {
+        await _ref.read(contactProvider.notifier).loadContacts();
+        contacts = _ref.read(contactProvider).contacts;
+      }
+
+      if (contacts.isEmpty) {
+        return {'success': false, 'error': 'No emergency contacts available'};
+      }
+
+      Contact target;
+      if (contactName != null && contactName.isNotEmpty) {
+        final match = contacts.where(
+          (c) => c.name.toLowerCase().contains(contactName.toLowerCase()),
+        );
+        if (match.isEmpty) {
+          return {
+            'success': false,
+            'error': 'Contact "$contactName" not found. Available contacts: ${contacts.map((c) => c.name).join(', ')}',
+          };
+        }
+        target = match.first;
+      } else {
+        target = contacts.first;
+      }
+
+      final msg = await FlutterTwilio.instance.sms.send(
+        to: target.phone,
+        body: message,
+      );
+
+      return {
+        'success': true,
+        'contactName': target.name,
+        'phone': target.phone,
+        'status': msg.status,
+      };
+    } on TwilioSmsException catch (e) {
+      return {
+        'success': false,
+        'error': 'SMS failed: ${e.message} (code: ${e.twilioCode})',
+      };
+    } catch (e) {
+      return {'success': false, 'error': 'Failed to send SMS: $e'};
     }
   }
 }
