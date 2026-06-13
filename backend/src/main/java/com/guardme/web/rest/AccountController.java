@@ -36,6 +36,41 @@ public class AccountController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PutMapping("/account")
+    public ResponseEntity<User> updateAccount(@Valid @RequestBody UpdateProfileRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String login = authentication.getName();
+        log.debug("REST request to update account for user: {}", login);
+        return userService.getUserByLogin(login)
+                .map(user -> {
+                    User updated = userService.updateProfile(
+                            user.getId(),
+                            request.firstName(),
+                            request.lastName(),
+                            request.email()
+                    );
+                    return ResponseEntity.ok(updated);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/account/change-password")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String login = authentication.getName();
+        log.debug("REST request to change password for user: {}", login);
+        return userService.getUserByLogin(login)
+                .map(user -> {
+                    try {
+                        userService.changePassword(user.getId(), request.currentPassword(), request.newPassword());
+                        return ResponseEntity.ok().<Void>build();
+                    } catch (IllegalArgumentException e) {
+                        return ResponseEntity.badRequest().<Void>build();
+                    }
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @PostMapping("/register")
     public ResponseEntity<User> registerAccount(@Valid @RequestBody RegisterRequest registerRequest) {
         log.debug("REST request to register user: {}", registerRequest.login());
@@ -51,6 +86,15 @@ public class AccountController {
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
+
+    public record UpdateProfileRequest(
+            @Size(max = 50) String firstName,
+            @Size(max = 50) String lastName,
+            @Email @Size(max = 254) String email) {}
+
+    public record ChangePasswordRequest(
+            @NotBlank String currentPassword,
+            @NotBlank @Size(min = 4, max = 60) String newPassword) {}
 
     public record RegisterRequest(
             @NotBlank @Size(min = 1, max = 50) String login,

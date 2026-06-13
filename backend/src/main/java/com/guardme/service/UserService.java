@@ -68,4 +68,25 @@ public class UserService {
     public Optional<User> getUserByLogin(String login) {
         return userRepository.findOneWithAuthoritiesByLogin(login);
     }
+
+    public User updateProfile(Long userId, String firstName, String lastName, String email) {
+        log.debug("Updating profile for user id: {}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEmail(email);
+        return userRepository.save(user);
+    }
+
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        log.debug("Changing password for user id: {}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
 }

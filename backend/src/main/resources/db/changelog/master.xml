@@ -219,4 +219,23 @@
         </insert>
     </changeSet>
 
+    <changeSet id="12" author="guardme">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM jhi_user WHERE login = 'admin'</sqlCheck>
+        </preConditions>
+        <insert tableName="jhi_user">
+            <column name="login" value="admin"/>
+            <column name="password_hash" value="$2a$10$kc2b5SuGxp/qs/S/gl9f6eMlJzZFB3RXA9eVJjEWA9tN6Qs58HRv2"/>
+            <column name="first_name" value="Admin"/>
+            <column name="last_name" value="User"/>
+            <column name="email" value="admin@guardme.com"/>
+            <column name="activated" valueBoolean="true"/>
+            <column name="lang_key" value="en"/>
+        </insert>
+        <insert tableName="jhi_user_authority">
+            <column name="user_id" valueComputed="(SELECT id FROM jhi_user WHERE login = 'admin')"/>
+            <column name="authority_name" value="ROLE_ADMIN"/>
+        </insert>
+    </changeSet>
+
 </databaseChangeLog>
